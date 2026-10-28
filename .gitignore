@@ -1,0 +1,9 @@
+# Runtime state and local configuration
+bot/.env
+bot/data/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

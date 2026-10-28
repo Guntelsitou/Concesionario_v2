@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Gestión de inventario</title>
+  <style>
+    :root{font:16px/1.5 system-ui,sans-serif;color:#17232a;background:#f2f3ef}*{box-sizing:border-box}body{margin:0}header{background:#12181d;color:#fff;padding:20px max(20px,calc((100% - 1100px)/2))}main{max-width:1100px;margin:28px auto;padding:0 20px}h1{margin:0;font-size:1.6rem}p{color:#56616a}.login{display:flex;gap:8px;max-width:600px}.login input{flex:1}input,select,textarea,button{font:inherit;padding:9px 11px;border:1px solid #c8cec9;border-radius:6px;background:#fff;color:inherit}button{background:#0d4a63;color:#fff;border:0;cursor:pointer}button:disabled{opacity:.5;cursor:wait}.item{background:#fff;border:1px solid #d5d9d1;border-radius:10px;padding:18px;margin:14px 0}.item h2{font-size:1.1rem;margin:0 0 10px}.fields{display:grid;grid-template-columns:150px 190px 1fr auto;gap:10px;align-items:start}.fields label{display:grid;gap:4px;font-size:.85rem;color:#56616a}.fields textarea{min-height:78px;resize:vertical}.msg{min-height:24px;margin:8px 0}.error{color:#a32d2d}.ok{color:#217044}@media(max-width:760px){.fields{grid-template-columns:1fr 1fr}.fields label:nth-child(3){grid-column:1/-1}.fields button{align-self:end}.login{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <header><h1>Gestión de inventario</h1></header>
+  <main>
+    <p>Introduce el token de administrador configurado en <code>ADMIN_API_TOKEN</code>. El token se conserva solo en esta pestaña.</p>
+    <form class="login" id="login"><input id="token" type="password" autocomplete="current-password" placeholder="Token de administrador" required><button>Conectar</button></form>
+    <p class="msg" id="message" role="status"></p>
+    <section id="cars" aria-live="polite"></section>
+  </main>
+  <script>
+    const $=s=>document.querySelector(s), esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    let token=sessionStorage.getItem("inventory_admin_token")||"";
+    function message(text,kind=""){const el=$("#message");el.textContent=text;el.className="msg "+kind;}
+    async function api(url,options={}){const r=await fetch(url,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});if(!r.ok){let body={};try{body=await r.json()}catch{}throw new Error(body.detail||`Error ${r.status}`)}return r.json()}
+    async function load(){try{const cars=await api("/api/vehiculos");$("#cars").innerHTML=cars.map(c=>`<article class="item" data-ref="${esc(c.ref)}"><h2>${esc(c.ref)} · ${esc(c.marca)} ${esc(c.modelo)} ${esc(c.version)}</h2><div class="fields"><label>Precio (€)<input class="price" type="number" min="1" step="1" value="${Number(c.precio)||0}"></label><label>Estado<select class="state"><option value="disponible" ${!c.vendido&&!c.reservado?"selected":""}>Disponible</option><option value="reservado" ${c.reservado?"selected":""}>Reservado</option><option value="vendido" ${c.vendido?"selected":""}>Vendido</option></select></label><label>Descripción<textarea class="description" maxlength="3000">${esc(c.descripcion||"")}</textarea></label><button class="save">Guardar</button></div></article>`).join("")||"<p>No hay vehículos en el inventario.</p>";message(`${cars.length} vehículos cargados.`,"ok");}catch(e){message(e.message,"error");}}
+    $("#login").addEventListener("submit",e=>{e.preventDefault();token=$("#token").value.trim();sessionStorage.setItem("inventory_admin_token",token);load();});
+    $("#cars").addEventListener("click",async e=>{const button=e.target.closest(".save");if(!button)return;const card=button.closest("[data-ref]");button.disabled=true;try{const result=await api("/api/vehiculos/"+encodeURIComponent(card.dataset.ref),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({precio:Number(card.querySelector(".price").value),estado:card.querySelector(".state").value,descripcion:card.querySelector(".description").value})});message(result.desplegado?`Vehículo ${card.dataset.ref} actualizado y publicado.`:`Cambios guardados para ${card.dataset.ref}, pero falló la publicación Git. Revisa los logs del backend.`,result.desplegado?"ok":"error");}catch(err){message(err.message,"error");}finally{button.disabled=false;}});
+    if(token){$("#token").value=token;load();}
+  </script>
+</body>
+</html>

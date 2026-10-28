@@ -1,0 +1,5 @@
+# Optional LLM-generated listing descriptions
+anthropic>=0.40
+
+# Optional Telegram alternative bot
+python-telegram-bot==21.6
